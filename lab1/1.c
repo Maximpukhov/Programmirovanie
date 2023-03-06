@@ -8,7 +8,6 @@ void init(int* arr, int n)
         {
                 arr[i] = i;
         }
-	return arr;
 }
 
 int main()
