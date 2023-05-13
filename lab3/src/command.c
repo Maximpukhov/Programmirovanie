@@ -1,9 +1,6 @@
 #include <stdio.h>
-
 #include <inttypes.h>
-
 #include "command.h"
-
 #include "coder.h"
 
 int encode_file(const char * in_file_name,
