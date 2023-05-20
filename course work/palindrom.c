@@ -31,13 +31,11 @@ int isPalindrome(const wchar_t* str) {
 }
 
 void checkPalindromesFromFile(const char* filename) {
-
     FILE* file = fopen(filename, "r");
     if (file == NULL) {
         wprintf(L"Не удалось открыть файл.\n");
         return;
     }
-
     wchar_t* line = malloc(1000 * sizeof(wchar_t)); // Динамическое выделение памяти
     if (line == NULL) {
         wprintf(L"Ошибка выделения памяти.\n");
