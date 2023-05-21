@@ -14,7 +14,6 @@ int schr(char str[], const char subchar) {
 	return -1; 
 }
 
-// I'm not sure of it
 int stok(char str[], const char delim, char *ptr[]) {
     char* suf = str;
     ptr[0] = str;
