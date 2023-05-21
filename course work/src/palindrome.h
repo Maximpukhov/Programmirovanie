@@ -4,4 +4,4 @@
 int isPalindrome(const wchar_t* str);
 void checkPalindromesFromFile(const char* filename);
 
-#endif /* PALINDROME_H */
+#endif
