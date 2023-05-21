@@ -2,82 +2,82 @@
 #include <wchar.h>
 #include <wctype.h>
 #include <stdlib.h>
-#include "palindrome.h"
+#include «palindrome.h»
 
-int isPalindrome(const wchar_t * str) {
-    int length = wcslen(str);
-    int i = 0;
-    int j = length - 1;
+Int isPalindrome(const wchar_t* str) {
+    Int length = wcslen(str);
+    Int i = 0;
+    Int j = length – 1;
 
-    while (i < j) {
+    While (i < j) {
         // Пропускаем пробелы и знаки пунктуации в начале строки
-        while (i < length && !iswalpha(str[i])) {
-            i++;
+        While (i < length && !iswalpha(str[i])) {
+            I++;
         }
         // Пропускаем пробелы и знаки пунктуации в конце строки
-        while (j >= 0 && !iswalpha(str[j])) {
+        While (j >= 0 && !iswalpha(str[j])) {
             j--;
         }
 
-        if (i < j && towlower(str[i]) != towlower(str[j])) {
-            return 0; // Не палиндром
+        If (i < j && towlower(str[i]) != towlower(str[j])) {
+            Return 0; // Не палиндром
         }
 
-        i++;
+        I++;
         j--;
     }
 
-    return 1; // Палиндром
+    Return 1; // Палиндром
 }
 
-void checkPalindromesFromFile(const char * filename) {
-    FILE * file = fopen(filename, "r");
-    if (file == NULL) {
-        wprintf(L "Не удалось открыть файл.\n");
-        return;
+Void checkPalindromesFromFile(const char* filename) {
+    FILE* file = fopen(filename, «r»);
+    If (file == NULL) {
+        Wprintf(L»Не удалось открыть файл.\n»);
+        Return;
     }
-    wchar_t * line = malloc(1000 * sizeof(wchar_t)); // Динамическое выделение памяти
-    if (line == NULL) {
-        wprintf(L "Ошибка выделения памяти.\n");
-        fclose(file);
-        return;
+    Wchar_t* line = malloc(1000 * sizeof(wchar_t)); // Динамическое выделение памяти
+    If (line == NULL) {
+        Wprintf(L»Ошибка выделения памяти.\n»);
+        Fclose(file);
+        Return;
     }
 
-    int totalPalindromes = 0; // Общее количество палиндромических предложений
-    wprintf(L "Палиндромические предложения:\n");
+    Int totalPalindromes = 0; // Общее количество палиндромических предложений
+    Wprintf(L»Палиндромические предложения:\n»);
 
-    while (fgetws(line, 1000, file)) {
+    While (fgetws(line, 1000, file)) {
         // Удаление символа новой строки, если присутствует
-        if (line[wcslen(line) - 1] == L '\n') {
-            line[wcslen(line) - 1] = L '\0';
+        If (line[wcslen(line) – 1] == L'\n') {
+            Line[wcslen(line) – 1] = L'\0';
         }
 
-        wchar_t * context;
-        wchar_t * sentence = wcstok(line, L ".!?\n", & context); // Разделение строки на предложения
+        Wchar_t* context;
+        Wchar_t* sentence = wcstok(line, L».!?\n», &context); // Разделение строки на предложения
 
-        while (sentence != NULL) {
+        While (sentence != NULL) {
             // Удаление начальных и конечных пробелов
-            while (iswspace(@id14665824( * sentence))) {
-                sentence++;
+            While (iswspace(*sentence)) {
+                Sentence++;
             }
-            wchar_t * end = sentence + wcslen(sentence) - 1;
-            while (end > sentence && iswspace( * end)) {
-                * end = L '\0';
-                end--;
+            Wchar_t* end = sentence + wcslen(sentence) – 1;
+            While (end > sentence && iswspace(*end)) {
+                *end = L'\0';
+                End--;
             }
 
             // Игнорирование пустых строк
-            if (wcslen(sentence) > 1 && isPalindrome(sentence)) {
-                wprintf(L "%ls\n", sentence);
+            If (wcslen(sentence) > 1 && isPalindrome(sentence)) {
+                Wprintf(L»%ls\n», sentence);
                 totalPalindromes++;
             }
 
-            sentence = wcstok(NULL, L ".!?\n", & context);
+            Sentence = wcstok(NULL, L».!?\n», &context);
         }
     }
 
-    wprintf(L "\nОбщее количество палиндромических предложений: %d\n", totalPalindromes);
+    Wprintf(L»\nОбщее количество палиндромических предложений: %d\n», totalPalindromes);
 
-    fclose(file);
-    free(line); // Освобождение динамически выделенной памяти
+    Fclose(file);
+    Free(line); // Освобождение динамически выделенной памяти
 }
