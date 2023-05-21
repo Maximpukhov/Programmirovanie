@@ -14,3 +14,5 @@ $(EXECUTABLE): $(OBJECTS)
 
 clean:
 	rm src/*.o bin/*
+run: all
+	./$(EXECUTABLE)
