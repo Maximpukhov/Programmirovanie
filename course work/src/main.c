@@ -2,13 +2,13 @@
 #include <wchar.h>
 #include <locale.h>
 #include <stdlib.h>
-#include «palindrome.h»
+#include "palindrome.h"
 
-Int main(int argc, char **argv) {
-    Setlocale(LC_ALL, «»);
-    If (argc != 2) {
-        Wprintf(L»Использование:\n%s <имя файла>\n», argv[0]);
-        Return -1;
+int main(int argc, char **argv) {
+    setlocale(LC_ALL, "");
+    if (argc != 2) {
+        wprintf(L"Использование:\n%s <имя файла>\n", argv[0]);
+        return -1;
     }
     checkPalindromesFromFile(argv[1]);
 
