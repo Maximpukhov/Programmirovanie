@@ -26,4 +26,5 @@
 	margin: 0 auto;
 	width: 800px;
 	border-right: 5px double blue;
+	box-sizing: border-box;
 }
