@@ -19,10 +19,10 @@
 	text-align: justify;
 	background-color: white;
 	text-indent: 5em;
-	padding-top: 1em;
-	padding-bottom: 1em;
 	padding-left: 2em;
  	padding-right: 2em;
+	margin-top: 20px;
+	margin-bottom: 20px;
 	margin: 0 auto;
 	width: 800px;
 	border-right: 5px double blue;
