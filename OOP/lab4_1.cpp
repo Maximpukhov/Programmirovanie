@@ -66,7 +66,7 @@ public:
             }
         }
     }
-    Matrix(const Matrix &p) // конструкторо копирования
+    Matrix(const Matrix &p) // конструктор копирования
     {
         n = p.n;
         sum = p.sum;
