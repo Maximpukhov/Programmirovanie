@@ -18,7 +18,7 @@ template <typename T>
 class List : public Node<T>
 {
 public:
-    List() : Node<T>(0, head)
+    List() : head(NULL), Node<T>(0, head)
     {
         this->count = 0;
     }
