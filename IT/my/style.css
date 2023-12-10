@@ -263,7 +263,7 @@ margin-top: 26%;
 
 .offices__img__text{
   width: 250px;
-  color: #383838;
+  color: #000000;
   font-family: Open Sans;
   font-size: 24px;
   font-style: normal;
@@ -816,6 +816,165 @@ margin-top: 26%;
   .outro__subtext{
     transform: translateY(-40px);
   }
+}
+
+@media screen and (max-width:600px)
+{
+  .header{
+    width: 600px;
+  }
+
+  .header__logo{
+    transform: translate(20px, 20px);
+  }
+
+  .header__list{
+    transform: translate(200px, -5px);
+    margin-right: 120px;
+  }
+
+  .wrapper{
+    width: 600px;
+  }
+
+  .intro__title{
+    transform: translate(-30px, 0px);
+  }
+
+  .intro{
+    width:  600px;
+  }
+
+  .news-button{
+    transform: translate(-30px, 170px);
+  }
+
+  .intro__button{
+    transform: translate(0, 100px);
+  }
+
+  .info__wrap{
+    transform: translate(-250px, -250px);
+    width: 500px;
+    height: 830px;
+  }
+
+  .info__text{
+    width: 400px;
+  }
+
+  .offices__img-pic1{
+    width: 200px;
+    height: 400px;
+    transform: translate(-100px, -410px);
+  }
+
+  .offices__subtitle{
+    width: 150px;
+  }
+
+  .offices{
+    width: 600px;
+    transform: translate(0px, 400px);
+  }
+
+  .offices__img-pic2{
+    width: 200px;
+    height: 400px;
+    transform: translate(-430px, -320px);
+  }
+
+  .offices__button{
+    transform: translate(-130px, -650px);
+  }
+
+  .offices__img__text{
+    font-size: 18px;
+    transform: translate(-600px, -980px);
+    width: 200px;
+  }
+
+  .request__wrap{
+    width: 600px;
+  }
+
+  .request__title{
+    transform: translate(40px, 0px);
+  }
+
+  .request__subtitle{
+    transform: translate(-30px, 0px);
+  }
+
+  .request__form__info{
+    transform: translate(50px, -20px);
+  }
+
+  .request__form__button{
+    transform: translate(150px, 10px);
+  }
+
+  .company__subtitle{
+    width: 250px;
+    font-size: 14px;
+    transform: translate(-220px, 270px);
+  }
+
+  .company__tagline{
+    font-size: 30px;
+    transform: translate(-220px, -400px);
+  }
+
+  .company__button{
+    transform: translate(-560px, 400px);
+  }
+
+  .showreel__title{
+    transform: translate(0px, -300px);
+  }
+
+  .showreel__img{
+    width: 500px;
+    height: 300px;
+    transform: translate(50px, 100px);
+  }
+
+  .map__title{
+    transform: translate(-500px, -500px);
+  }
+
+  .map{
+    max-height: 500px;
+  }
+
+  .map__img-pic{
+    width: 500px;
+    max-height: 300px;
+    transform: translate(-150px, -800px);
+  }
+
+  .outro__wrap{
+    width: 600px;
+    height: 200px;
+  }
+
+  .outro__logo{
+    transform: translate(-80px, -150px);
+  }
+
+  .outro__text{
+    transform: translate(-180px, 20px);
+  }
+
+  .outro__subtext{
+    transform: translate(-260px, -50px);
+    width: 100px;
+  }
+
+  .outro__list{
+    transform: translate(-1325px, 20px);
+  }
+
 }
 
 /*Media end*/
