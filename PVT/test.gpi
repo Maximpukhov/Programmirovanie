@@ -1,0 +1,17 @@
+#! /usr/bin/gnuplot -persist
+set terminal png size 800, 600
+
+set output "result.png"
+
+set datafile separator ';'
+set grid xtics ytics
+
+set ylabel "Коэффициет ускорения"
+set xlabel "Количество потоков"
+set title "Анализ эффективности распараллеливания программы"
+
+set xrange [1:8]
+set yrange [0.0:5.0]
+
+
+plot "result.csv" using 1:2 with line lw 3 lc rgb "red" title "15.000", '' using 3:4 with line lw 3 lc rgb "orange" title "20.000", '' using 5:6 with line lw 3 lc rgb "green" title "25.000"
