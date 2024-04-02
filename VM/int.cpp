@@ -3,7 +3,7 @@
 
 double fun(float x)
 {
-    return 1.5 - 0.4 * sqrt(x * x * x) - 0.5 * log(x);
+    return 1 - 0.5 * x*x * log(x) + 0.3 * sqrt(x);
 }
 
 double hord(double a, double b, double p)
