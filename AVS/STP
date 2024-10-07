@@ -1,0 +1,61 @@
+#include <algorithm>
+#include <chrono>
+#include <fstream>
+#include <iostream>
+#include <map>
+#include <vector>
+
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    std::cerr << "Usage: " << argv[0] << " <file_path>\n";
+    return 1;
+  }
+
+  std::ifstream file(argv[1]);
+  if (!file) {
+    std::cerr << "Error opening file.\n";
+    return 1;
+  }
+
+  // Чтение всех слов в вектор до измерения времени
+  std::vector<std::string> words;
+  std::string word;
+  while (file >> word) {
+    words.push_back(word);
+  }
+
+  // Теперь начинаем измерение времени построения частотного словаря
+  std::map<std::string, int> freq_map;
+  auto start = std::chrono::steady_clock::now();
+  for (const auto& w : words) {
+    ++freq_map[w];
+  }
+  auto finish = std::chrono::steady_clock::now();
+  auto build_duration =
+      std::chrono::duration_cast<std::chrono::microseconds>(finish - start);
+  std::cout << "build: " << build_duration.count() << " µs\n";
+
+  // Копирование данных в вектор для сортировки
+  std::vector<std::pair<std::string, int>> freq_vector(freq_map.begin(),
+                                                       freq_map.end());
+
+  // Измеряем время сортировки
+  start = std::chrono::steady_clock::now();
+  std::sort(freq_vector.begin(), freq_vector.end(),
+            [](const auto& a, const auto& b) {
+              return (a.second > b.second) ||
+                     (a.second == b.second && a.first < b.first);
+            });
+  finish = std::chrono::steady_clock::now();
+  auto sort_duration =
+      std::chrono::duration_cast<std::chrono::microseconds>(finish - start);
+  std::cout << "sort: " << sort_duration.count() << " µs\n";
+
+  // Выводим топ-10 самых частых слов
+  for (std::vector<std::pair<std::string, int>>::size_type i = 0;
+       i < 10 && i < freq_vector.size(); ++i) {
+    std::cout << freq_vector[i].second << " " << freq_vector[i].first << "\n";
+  }
+
+  return 0;
+}
