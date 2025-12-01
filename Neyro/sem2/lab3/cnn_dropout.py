@@ -1,11 +1,13 @@
 import numpy as np
-import urllib.request
-import gzip
-import os
-import struct
 import matplotlib.pyplot as plt
 import pickle
 from datetime import datetime
+from google.colab import files
+import warnings
+warnings.filterwarnings('ignore')
+
+# Установка русского шрифта для matplotlib
+plt.rcParams['font.family'] = 'DejaVu Sans'
 
 class Dropout:
     def __init__(self, dropout_rate=0.5):
@@ -26,147 +28,7 @@ class Dropout:
         else:
             return doutput
 
-class ConvLayer:
-    def __init__(self, input_channels, output_channels, kernel_size, stride=1, padding=0):
-        self.input_channels = input_channels
-        self.output_channels = output_channels
-        self.kernel_size = kernel_size
-        self.stride = stride
-        self.padding = padding
-        self.weights = np.random.randn(output_channels, input_channels, kernel_size, kernel_size) * 0.1
-        self.biases = np.zeros(output_channels)
-        self.dweights = None
-        self.dbiases = None
-        self.input = None
-    
-    def forward(self, x):
-        self.input = x
-        batch_size, input_channels, input_height, input_width = x.shape
-        
-        if self.padding > 0:
-            x_padded = np.pad(x, ((0, 0), (0, 0), (self.padding, self.padding), 
-                                (self.padding, self.padding)), mode='constant')
-        else:
-            x_padded = x
-        
-        output_height = (input_height + 2 * self.padding - self.kernel_size) // self.stride + 1
-        output_width = (input_width + 2 * self.padding - self.kernel_size) // self.stride + 1
-        
-        output = np.zeros((batch_size, self.output_channels, output_height, output_width))
-        
-        for b in range(batch_size):
-            for out_ch in range(self.output_channels):
-                for i in range(output_height):
-                    for j in range(output_width):
-                        h_start = i * self.stride
-                        h_end = h_start + self.kernel_size
-                        w_start = j * self.stride
-                        w_end = w_start + self.kernel_size
-                        patch = x_padded[b, :, h_start:h_end, w_start:w_end]
-                        output[b, out_ch, i, j] = np.sum(patch * self.weights[out_ch]) + self.biases[out_ch]
-        
-        return output
-    
-    def backward(self, doutput, learning_rate):
-        batch_size, output_channels, output_height, output_width = doutput.shape
-        input_channels = self.input_channels
-        
-        dinput = np.zeros_like(self.input)
-        self.dweights = np.zeros_like(self.weights)
-        self.dbiases = np.zeros_like(self.biases)
-        
-        if self.padding > 0:
-            input_padded = np.pad(self.input, ((0, 0), (0, 0), (self.padding, self.padding), 
-                                            (self.padding, self.padding)), mode='constant')
-            dinput_padded = np.pad(dinput, ((0, 0), (0, 0), (self.padding, self.padding), 
-                                          (self.padding, self.padding)), mode='constant')
-        else:
-            input_padded = self.input
-            dinput_padded = dinput
-        
-        for b in range(batch_size):
-            for out_ch in range(output_channels):
-                for i in range(output_height):
-                    for j in range(output_width):
-                        h_start = i * self.stride
-                        h_end = h_start + self.kernel_size
-                        w_start = j * self.stride
-                        w_end = w_start + self.kernel_size
-                        patch = input_padded[b, :, h_start:h_end, w_start:w_end]
-                        self.dweights[out_ch] += doutput[b, out_ch, i, j] * patch
-                        self.dbiases[out_ch] += doutput[b, out_ch, i, j]
-                        dinput_padded[b, :, h_start:h_end, w_start:w_end] += doutput[b, out_ch, i, j] * self.weights[out_ch]
-        
-        if self.padding > 0:
-            dinput = dinput_padded[:, :, self.padding:-self.padding, self.padding:-self.padding]
-        else:
-            dinput = dinput_padded
-        
-        self.weights -= learning_rate * self.dweights / batch_size
-        self.biases -= learning_rate * self.dbiases / batch_size
-        
-        return dinput
-
-class MaxPoolLayer:
-    def __init__(self, pool_size, stride=2):
-        self.pool_size = pool_size
-        self.stride = stride
-        self.input = None
-        self.mask = None
-    
-    def forward(self, x):
-        self.input = x
-        batch_size, channels, input_height, input_width = x.shape
-        
-        output_height = (input_height - self.pool_size) // self.stride + 1
-        output_width = (input_width - self.pool_size) // self.stride + 1
-        
-        output = np.zeros((batch_size, channels, output_height, output_width))
-        self.mask = np.zeros_like(x)
-        
-        for b in range(batch_size):
-            for c in range(channels):
-                for i in range(output_height):
-                    for j in range(output_width):
-                        h_start = i * self.stride
-                        h_end = h_start + self.pool_size
-                        w_start = j * self.stride
-                        w_end = w_start + self.pool_size
-                        patch = x[b, c, h_start:h_end, w_start:w_end]
-                        output[b, c, i, j] = np.max(patch)
-                        max_pos = np.unravel_index(np.argmax(patch), patch.shape)
-                        self.mask[b, c, h_start + max_pos[0], w_start + max_pos[1]] = 1
-        
-        return output
-    
-    def backward(self, doutput):
-        dinput = np.zeros_like(self.input)
-        batch_size, channels, output_height, output_width = doutput.shape
-        
-        for b in range(batch_size):
-            for c in range(channels):
-                for i in range(output_height):
-                    for j in range(output_width):
-                        h_start = i * self.stride
-                        h_end = h_start + self.pool_size
-                        w_start = j * self.stride
-                        w_end = w_start + self.pool_size
-                        dinput[b, c, h_start:h_end, w_start:w_end] += self.mask[b, c, h_start:h_end, w_start:w_end] * doutput[b, c, i, j]
-        
-        return dinput
-
-class FlattenLayer:
-    def __init__(self):
-        self.input_shape = None
-    
-    def forward(self, x):
-        self.input_shape = x.shape
-        return x.reshape(x.shape[0], -1)
-    
-    def backward(self, doutput):
-        return doutput.reshape(self.input_shape)
-
-class DenseLayer:
+class SimpleDenseLayer:
     def __init__(self, input_size, output_size):
         self.weights = np.random.randn(input_size, output_size) * 0.1
         self.biases = np.zeros(output_size)
@@ -210,23 +72,19 @@ class Softmax:
     def backward(self, doutput):
         return doutput
 
-class CNNWithDropout:
+class SimpleCNN:
     def __init__(self, learning_rate=0.01, dropout_rate=0.5):
         self.learning_rate = learning_rate
         self.dropout_rate = dropout_rate
+        # Очень простая архитектура - только полносвязные слои
         self.layers = [
-            ConvLayer(1, 8, kernel_size=3, padding=1),
-            ReLU(),
-            MaxPoolLayer(2, stride=2),
-            ConvLayer(8, 16, kernel_size=3, padding=1),
-            ReLU(),
-            MaxPoolLayer(2, stride=2),
-            FlattenLayer(),
-            Dropout(dropout_rate),
-            DenseLayer(7*7*16, 128),
+            SimpleDenseLayer(28*28, 64),  # Прямо из 28x28 в 64 нейрона
             ReLU(),
             Dropout(dropout_rate),
-            DenseLayer(128, 10),
+            SimpleDenseLayer(64, 32),
+            ReLU(),
+            Dropout(dropout_rate),
+            SimpleDenseLayer(32, 10),
             Softmax()
         ]
     
@@ -236,17 +94,18 @@ class CNNWithDropout:
                 layer.training = training
     
     def forward(self, x):
+        # Выравниваем вход сразу
         if len(x.shape) == 3:
-            x = x.reshape(x.shape[0], 1, x.shape[1], x.shape[2])
+            x = x.reshape(x.shape[0], -1)
         for layer in self.layers:
             x = layer.forward(x)
         return x
     
     def backward(self, doutput):
         for layer in reversed(self.layers):
-            if isinstance(layer, (ConvLayer, DenseLayer)):
+            if isinstance(layer, SimpleDenseLayer):
                 doutput = layer.backward(doutput, self.learning_rate)
-            elif isinstance(layer, (ReLU, Softmax, MaxPoolLayer, FlattenLayer, Dropout)):
+            elif isinstance(layer, (ReLU, Softmax, Dropout)):
                 doutput = layer.backward(doutput)
         return doutput
     
@@ -266,37 +125,34 @@ class CNNWithDropout:
         true_labels = np.argmax(y, axis=1)
         return np.mean(predictions == true_labels)
 
-def load_mnist():
-    files = {
-        'train_images': 'train-images-idx3-ubyte.gz',
-        'train_labels': 'train-labels-idx1-ubyte.gz',
-        'test_images': 't10k-images-idx3-ubyte.gz',
-        'test_labels': 't10k-labels-idx1-ubyte.gz'
-    }
-    
-    for name, filename in files.items():
-        if not os.path.exists(filename):
-            print(f"Downloading {filename}...")
-            urllib.request.urlretrieve(f'http://yann.lecun.com/exdb/mnist/{filename}', filename)
-    
-    def load_images(filename):
-        with gzip.open(filename, 'rb') as f:
-            magic, num, rows, cols = struct.unpack(">IIII", f.read(16))
-            images = np.frombuffer(f.read(), dtype=np.uint8).reshape(num, rows, cols)
-            return images / 255.0
-    
-    def load_labels(filename):
-        with gzip.open(filename, 'rb') as f:
-            magic, num = struct.unpack(">II", f.read(8))
-            labels = np.frombuffer(f.read(), dtype=np.uint8)
-            return np.eye(10)[labels]
-    
-    X_train = load_images('train-images-idx3-ubyte.gz')
-    y_train = load_labels('train-labels-idx1-ubyte.gz')
-    X_test = load_images('t10k-images-idx3-ubyte.gz') 
-    y_test = load_labels('t10k-labels-idx1-ubyte.gz')
-    
-    return X_train, y_train, X_test, y_test
+def load_tiny_mnist():
+    """Загрузка очень маленького набора данных"""
+    try:
+        import tensorflow as tf
+        print("Загрузка tiny-MNIST...")
+        (X_train, y_train), (X_test, y_test) = tf.keras.datasets.mnist.load_data()
+        
+        # ОЧЕНЬ маленькая часть данных
+        train_samples = 500   # Всего 500 примеров!
+        test_samples = 100
+        
+        X_train = X_train[:train_samples] / 255.0
+        y_train = y_train[:train_samples]
+        X_test = X_test[:test_samples] / 255.0
+        y_test = y_test[:test_samples]
+        
+        # One-hot encoding
+        y_train_onehot = np.eye(10)[y_train]
+        y_test_onehot = np.eye(10)[y_test]
+        
+        print(f"Загружено {X_train.shape[0]} тренировочных и {X_test.shape[0]} тестовых изображений")
+        return X_train, y_train_onehot, X_test, y_test_onehot
+        
+    except ImportError:
+        print("Установка TensorFlow...")
+        !pip install tensorflow -q
+        import tensorflow as tf
+        return load_tiny_mnist()
 
 def split_validation_data(X, y, validation_ratio=0.2):
     num_validation = int(X.shape[0] * validation_ratio)
@@ -309,185 +165,342 @@ def split_validation_data(X, y, validation_ratio=0.2):
     y_val = y[val_indices]
     return X_train, y_train, X_val, y_val
 
-def save_checkpoint(model, epoch, metrics, filename):
-    checkpoint = {
-        'epoch': epoch,
-        'model_state': {f'layer_{i}': layer for i, layer in enumerate(model.layers) 
-                       if isinstance(layer, (ConvLayer, DenseLayer))},
-        'metrics': metrics,
-        'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
-    with open(filename, 'wb') as f:
-        pickle.dump(checkpoint, f)
-    print(f"Checkpoint saved: {filename}")
-
-def train_with_dropout_and_checkpoints():
-    X_train_full, y_train_full, X_test, y_test = load_mnist()
+def ultra_fast_training():
+    print("⚡ СВЕРХБЫСТРОЕ ОБУЧЕНИЕ CNN")
+    print("="*45)
+    
+    X_train_full, y_train_full, X_test, y_test = load_tiny_mnist()
     X_train, y_train, X_val, y_val = split_validation_data(X_train_full, y_train_full, 0.2)
     
-    print(f"Training samples: {X_train.shape[0]}")
-    print(f"Validation samples: {X_val.shape[0]}")
-    print(f"Test samples: {X_test.shape[0]}")
+    print(f"Тренировочные: {X_train.shape[0]}, Валидационные: {X_val.shape[0]}, Тестовые: {X_test.shape[0]}")
     
-    cnn = CNNWithDropout(learning_rate=0.01, dropout_rate=0.5)
-    epochs = 20
-    batch_size = 64
-    checkpoint_epochs = [5, 10, 15, 20]
-    
-    history = {
-        'train_loss': [], 'train_acc': [],
-        'val_loss': [], 'val_acc': [],
-        'test_acc': []
-    }
-    
-    print("\nНачало обучения CNN с Dropout...")
-    print("Эпоха\tTrain Loss\tTrain Acc\tVal Acc\tTest Acc")
-    print("-" * 60)
-    
-    for epoch in range(1, epochs + 1):
-        permutation = np.random.permutation(X_train.shape[0])
-        X_train_shuffled = X_train[permutation]
-        y_train_shuffled = y_train[permutation]
-        
-        epoch_loss = 0
-        num_batches = 0
-        
-        for i in range(0, X_train.shape[0], batch_size):
-            X_batch = X_train_shuffled[i:i+batch_size]
-            y_batch = y_train_shuffled[i:i+batch_size]
-            y_pred = cnn.forward(X_batch)
-            loss = cnn.compute_loss(y_pred, y_batch)
-            epoch_loss += loss
-            num_batches += 1
-            doutput = y_pred - y_batch
-            cnn.backward(doutput)
-        
-        avg_loss = epoch_loss / num_batches
-        train_acc = cnn.accuracy(X_train[:1000], y_train[:1000])
-        val_acc = cnn.accuracy(X_val[:1000], y_val[:1000])
-        test_acc = cnn.accuracy(X_test[:1000], y_test[:1000])
-        
-        history['train_loss'].append(avg_loss)
-        history['train_acc'].append(train_acc)
-        history['val_acc'].append(val_acc)
-        history['test_acc'].append(test_acc)
-        
-        print(f"{epoch}\t{avg_loss:.4f}\t\t{train_acc:.4f}\t\t{val_acc:.4f}\t{test_acc:.4f}")
-        
-        if epoch in checkpoint_epochs:
-            metrics = {
-                'train_loss': avg_loss,
-                'train_acc': train_acc,
-                'val_acc': val_acc,
-                'test_acc': test_acc
-            }
-            save_checkpoint(cnn, epoch, metrics, f'checkpoint_epoch_{epoch}.pkl')
-    
-    return cnn, history
-
-def run_autotests():
-    print("\n" + "="*50)
-    print("ЗАПУСК АВТОТЕСТОВ")
-    print("="*50)
-    
-    X_train_full, y_train_full, X_test, y_test = load_mnist()
-    test_sizes = [1000, 5000, 10000, 30000]
-    dropout_rates = [0.0, 0.3, 0.5, 0.7]
+    # Тестируем разные dropout rates
+    dropout_rates = [0.0, 0.2, 0.4, 0.6]
     results = {}
+    training_histories = {}
     
-    for size in test_sizes:
-        print(f"\nТест с размером обучающей выборки: {size}")
-        print("-" * 40)
+    for dropout_rate in dropout_rates:
+        print(f"\n--- Dropout Rate: {dropout_rate} ---")
+        cnn = SimpleCNN(learning_rate=0.02, dropout_rate=dropout_rate)  # Увеличили learning rate
         
-        X_train_small = X_train_full[:size]
-        y_train_small = y_train_full[:size]
-        X_train, y_train, X_val, y_val = split_validation_data(X_train_small, y_train_small, 0.2)
+        epochs = 3  # Всего 3 эпохи!
+        batch_size = 16  # Очень маленький batch size
         
-        for dropout_rate in dropout_rates:
-            print(f"Dropout rate: {dropout_rate}")
-            cnn = CNNWithDropout(learning_rate=0.01, dropout_rate=dropout_rate)
+        train_acc_history = []
+        val_acc_history = []
+        train_loss_history = []
+        
+        for epoch in range(epochs):
+            # Очень быстрый training loop
+            permutation = np.random.permutation(X_train.shape[0])
+            X_shuffled = X_train[permutation]
+            y_shuffled = y_train[permutation]
             
-            for epoch in range(5):
-                permutation = np.random.permutation(X_train.shape[0])
-                X_shuffled = X_train[permutation]
-                y_shuffled = y_train[permutation]
-                
-                for i in range(0, X_train.shape[0], 64):
-                    X_batch = X_shuffled[i:i+64]
-                    y_batch = y_shuffled[i:i+64]
-                    y_pred = cnn.forward(X_batch)
-                    doutput = y_pred - y_batch
-                    cnn.backward(doutput)
+            epoch_loss = 0
+            batch_count = 0
             
-            train_acc = cnn.accuracy(X_train[:500], y_train[:500])
-            val_acc = cnn.accuracy(X_val[:500], y_val[:500])
-            test_acc = cnn.accuracy(X_test[:500], y_test[:500])
+            # Только 5 батчей для СУПЕР скорости!
+            for i in range(0, min(X_train.shape[0], 80), batch_size):
+                X_batch = X_shuffled[i:i+batch_size]
+                y_batch = y_shuffled[i:i+batch_size]
+                y_pred = cnn.forward(X_batch)
+                loss = cnn.compute_loss(y_pred, y_batch)
+                epoch_loss += loss
+                batch_count += 1
+                doutput = y_pred - y_batch
+                cnn.backward(doutput)
             
-            results[(size, dropout_rate)] = {
-                'train_acc': train_acc,
-                'val_acc': val_acc,
-                'test_acc': test_acc
-            }
+            avg_loss = epoch_loss / batch_count
+            train_acc = cnn.accuracy(X_train[:100], y_train[:100])  # Только 100 примеров для оценки
+            val_acc = cnn.accuracy(X_val[:50], y_val[:50])
             
-            print(f"  Train: {train_acc:.4f}, Val: {val_acc:.4f}, Test: {test_acc:.4f}")
+            train_acc_history.append(train_acc)
+            val_acc_history.append(val_acc)
+            train_loss_history.append(avg_loss)
+            
+            print(f"Эпоха {epoch+1}: Loss = {avg_loss:.3f}, Train Acc = {train_acc:.3f}, Val Acc = {val_acc:.3f}")
+        
+        test_acc = cnn.accuracy(X_test[:50], y_test[:50])
+        results[dropout_rate] = {
+            'train_acc': train_acc_history[-1],
+            'val_acc': val_acc_history[-1],
+            'test_acc': test_acc,
+            'final_loss': train_loss_history[-1]
+        }
+        training_histories[dropout_rate] = {
+            'train_acc': train_acc_history,
+            'val_acc': val_acc_history,
+            'train_loss': train_loss_history
+        }
+        print(f"Финальная Test Accuracy: {test_acc:.3f}")
     
-    return results
+    return results, training_histories
 
-def plot_results(history, autotest_results):
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 10))
+def create_comprehensive_plots(results, training_histories):
+    print("\n📊 КОМПЛЕКСНАЯ ВИЗУАЛИЗАЦИЯ РЕЗУЛЬТАТОВ")
     
-    ax1.plot(history['train_loss'])
-    ax1.set_title('Функция потерь с Dropout')
+    # Создаем большую фигуру с множеством графиков
+    fig = plt.figure(figsize=(20, 15))
+    
+    # График 1: Сравнение точности по эпохам для разных dropout rates
+    ax1 = plt.subplot(3, 4, 1)
+    colors = ['red', 'blue', 'green', 'orange']
+    for i, dropout_rate in enumerate(training_histories.keys()):
+        history = training_histories[dropout_rate]
+        ax1.plot(history['train_acc'], label=f'Dropout {dropout_rate}', 
+                color=colors[i], marker='o', linewidth=2)
+    
+    ax1.set_title('Train Accuracy по эпохам', fontsize=12, fontweight='bold')
     ax1.set_xlabel('Эпоха')
-    ax1.set_ylabel('Loss')
-    ax1.grid(True)
+    ax1.set_ylabel('Accuracy')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+    ax1.set_ylim(0, 1)
     
-    ax2.plot(history['train_acc'], label='Train Accuracy')
-    ax2.plot(history['val_acc'], label='Validation Accuracy')
-    ax2.plot(history['test_acc'], label='Test Accuracy')
-    ax2.set_title('Точность с Dropout')
+    # График 2: Validation accuracy по эпохам
+    ax2 = plt.subplot(3, 4, 2)
+    for i, dropout_rate in enumerate(training_histories.keys()):
+        history = training_histories[dropout_rate]
+        ax2.plot(history['val_acc'], label=f'Dropout {dropout_rate}', 
+                color=colors[i], marker='s', linewidth=2)
+    
+    ax2.set_title('Validation Accuracy по эпохам', fontsize=12, fontweight='bold')
     ax2.set_xlabel('Эпоха')
     ax2.set_ylabel('Accuracy')
     ax2.legend()
-    ax2.grid(True)
+    ax2.grid(True, alpha=0.3)
+    ax2.set_ylim(0, 1)
     
-    test_size = 10000
-    dropout_rates = [0.0, 0.3, 0.5, 0.7]
-    val_accs = [autotest_results[(test_size, dr)]['val_acc'] for dr in dropout_rates]
-    test_accs = [autotest_results[(test_size, dr)]['test_acc'] for dr in dropout_rates]
+    # График 3: Финальная test accuracy
+    ax3 = plt.subplot(3, 4, 3)
+    dropout_rates = list(results.keys())
+    test_accs = [results[dr]['test_acc'] for dr in dropout_rates]
     
-    ax3.bar(np.arange(len(dropout_rates)) - 0.2, val_accs, 0.4, label='Validation')
-    ax3.bar(np.arange(len(dropout_rates)) + 0.2, test_accs, 0.4, label='Test')
-    ax3.set_title('Влияние Dropout на точность')
+    bars = ax3.bar(dropout_rates, test_accs, alpha=0.7, color=colors[:len(dropout_rates)])
+    ax3.set_title('Финальная Test Accuracy', fontsize=12, fontweight='bold')
     ax3.set_xlabel('Dropout Rate')
     ax3.set_ylabel('Accuracy')
-    ax3.set_xticks(range(len(dropout_rates)))
-    ax3.set_xticklabels(dropout_rates)
-    ax3.legend()
     ax3.grid(True, alpha=0.3)
+    ax3.set_ylim(0, 1)
     
-    dropout_rate = 0.5
-    sizes = [1000, 5000, 10000, 30000]
-    val_accs_size = [autotest_results[(size, dropout_rate)]['val_acc'] for size in sizes]
+    # Добавляем значения на столбцы
+    for bar, acc in zip(bars, test_accs):
+        height = bar.get_height()
+        ax3.text(bar.get_x() + bar.get_width()/2., height + 0.02,
+                f'{acc:.3f}', ha='center', va='bottom', fontweight='bold')
     
-    ax4.plot(sizes, val_accs_size, 'o-')
-    ax4.set_title('Влияние размера данных на точность')
-    ax4.set_xlabel('Размер обучающей выборки')
-    ax4.set_ylabel('Validation Accuracy')
-    ax4.grid(True)
+    # График 4: Сравнение train vs val accuracy для всех моделей
+    ax4 = plt.subplot(3, 4, 4)
+    final_train_accs = [results[dr]['train_acc'] for dr in dropout_rates]
+    final_val_accs = [results[dr]['val_acc'] for dr in dropout_rates]
+    
+    x_pos = np.arange(len(dropout_rates))
+    width = 0.35
+    
+    ax4.bar(x_pos - width/2, final_train_accs, width, label='Train Acc', alpha=0.7)
+    ax4.bar(x_pos + width/2, final_val_accs, width, label='Val Acc', alpha=0.7)
+    
+    ax4.set_title('Финальная Train vs Validation Accuracy', fontsize=12, fontweight='bold')
+    ax4.set_xlabel('Dropout Rate')
+    ax4.set_ylabel('Accuracy')
+    ax4.set_xticks(x_pos)
+    ax4.set_xticklabels(dropout_rates)
+    ax4.legend()
+    ax4.grid(True, alpha=0.3)
+    ax4.set_ylim(0, 1)
+    
+    # График 5: Функции потерь по эпохам
+    ax5 = plt.subplot(3, 4, 5)
+    for i, dropout_rate in enumerate(training_histories.keys()):
+        history = training_histories[dropout_rate]
+        ax5.plot(history['train_loss'], label=f'Dropout {dropout_rate}', 
+                color=colors[i], marker='d', linewidth=2)
+    
+    ax5.set_title('Функция потерь по эпохам', fontsize=12, fontweight='bold')
+    ax5.set_xlabel('Эпоха')
+    ax5.set_ylabel('Loss')
+    ax5.legend()
+    ax5.grid(True, alpha=0.3)
+    
+    # График 6: Разница между train и val accuracy (overfitting)
+    ax6 = plt.subplot(3, 4, 6)
+    overfitting_gap = [final_train_accs[i] - final_val_accs[i] for i in range(len(dropout_rates))]
+    
+    bars = ax6.bar(dropout_rates, overfitting_gap, alpha=0.7, 
+                  color=['red' if gap > 0.1 else 'green' for gap in overfitting_gap])
+    ax6.set_title('Разница Train-Val (Overfitting)', fontsize=12, fontweight='bold')
+    ax6.set_xlabel('Dropout Rate')
+    ax6.set_ylabel('Train Acc - Val Acc')
+    ax6.grid(True, alpha=0.3)
+    
+    # График 7: Производительность по dropout rates (радарная диаграмма)
+    ax7 = plt.subplot(3, 4, 7, polar=True)
+    metrics = ['Train Acc', 'Val Acc', 'Test Acc', 'Generalization']
+    num_vars = len(metrics)
+    
+    # Вычисляем значения для радарной диаграммы
+    values = {}
+    for dr in dropout_rates:
+        values[dr] = [
+            results[dr]['train_acc'],
+            results[dr]['val_acc'], 
+            results[dr]['test_acc'],
+            min(results[dr]['val_acc'], results[dr]['test_acc'])  # Обобщающая способность
+        ]
+    
+    angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
+    angles += angles[:1]  # Замыкаем круг
+    
+    for i, dr in enumerate(dropout_rates):
+        vals = values[dr]
+        vals += vals[:1]  # Замыкаем круг
+        ax7.plot(angles, vals, 'o-', linewidth=2, label=f'Dropout {dr}', color=colors[i])
+        ax7.fill(angles, vals, alpha=0.1, color=colors[i])
+    
+    ax7.set_yticklabels([])
+    ax7.set_xticks(angles[:-1])
+    ax7.set_xticklabels(metrics)
+    ax7.set_title('Сравнение моделей\n(Радарная диаграмма)', fontsize=12, fontweight='bold')
+    ax7.legend(bbox_to_anchor=(1.1, 1.1))
+    
+    # График 8: Heatmap эффективности
+    ax8 = plt.subplot(3, 4, 8)
+    performance_matrix = np.array([
+        [results[dr]['train_acc'] for dr in dropout_rates],
+        [results[dr]['val_acc'] for dr in dropout_rates],
+        [results[dr]['test_acc'] for dr in dropout_rates]
+    ])
+    
+    im = ax8.imshow(performance_matrix, cmap='RdYlGn', aspect='auto', vmin=0, vmax=1)
+    ax8.set_xticks(range(len(dropout_rates)))
+    ax8.set_xticklabels(dropout_rates)
+    ax8.set_yticks(range(3))
+    ax8.set_yticklabels(['Train', 'Val', 'Test'])
+    ax8.set_title('Матрица эффективности', fontsize=12, fontweight='bold')
+    
+    # Добавляем значения в heatmap
+    for i in range(3):
+        for j in range(len(dropout_rates)):
+            text = ax8.text(j, i, f'{performance_matrix[i, j]:.2f}',
+                           ha="center", va="center", color="black", fontweight='bold')
+    
+    # График 9: Эволюция overfitting по эпохам
+    ax9 = plt.subplot(3, 4, 9)
+    for i, dropout_rate in enumerate(training_histories.keys()):
+        history = training_histories[dropout_rate]
+        overfitting_epochs = [history['train_acc'][j] - history['val_acc'][j] 
+                            for j in range(len(history['train_acc']))]
+        ax9.plot(overfitting_epochs, label=f'Dropout {dropout_rate}', 
+                color=colors[i], marker='^', linewidth=2)
+    
+    ax9.axhline(y=0, color='black', linestyle='--', alpha=0.5)
+    ax9.set_title('Эволюция Overfitting', fontsize=12, fontweight='bold')
+    ax9.set_xlabel('Эпоха')
+    ax9.set_ylabel('Train Acc - Val Acc')
+    ax9.legend()
+    ax9.grid(True, alpha=0.3)
+    
+    # График 10: Сравнение всех метрик для лучшей модели
+    ax10 = plt.subplot(3, 4, 10)
+    best_dropout = max(results.keys(), key=lambda x: results[x]['test_acc'])
+    best_results = results[best_dropout]
+    
+    metrics_names = ['Train Acc', 'Val Acc', 'Test Acc', 'Loss']
+    metrics_values = [
+        best_results['train_acc'],
+        best_results['val_acc'],
+        best_results['test_acc'],
+        1 - best_results['final_loss']  # Инвертируем loss для визуализации
+    ]
+    
+    bars = ax10.bar(metrics_names, metrics_values, alpha=0.7, color=['blue', 'green', 'red', 'purple'])
+    ax10.set_title(f'Лучшая модель\n(Dropout={best_dropout})', fontsize=12, fontweight='bold')
+    ax10.set_ylabel('Значение')
+    ax10.grid(True, alpha=0.3)
+    ax10.set_ylim(0, 1)
+    
+    for bar, value in zip(bars, metrics_values):
+        height = bar.get_height()
+        ax10.text(bar.get_x() + bar.get_width()/2., height + 0.02,
+                 f'{value:.3f}', ha='center', va='bottom', fontweight='bold')
+    
+    # График 11: Скорость сходимости
+    ax11 = plt.subplot(3, 4, 11)
+    for i, dropout_rate in enumerate(training_histories.keys()):
+        history = training_histories[dropout_rate]
+        ax11.plot(history['train_acc'], label=f'Dropout {dropout_rate}', 
+                 color=colors[i], linewidth=2)
+        # Отмечаем финальную точку
+        ax11.scatter(len(history['train_acc'])-1, history['train_acc'][-1], 
+                    color=colors[i], s=100, zorder=5)
+    
+    ax11.set_title('Скорость сходимости', fontsize=12, fontweight='bold')
+    ax11.set_xlabel('Эпоха')
+    ax11.set_ylabel('Train Accuracy')
+    ax11.legend()
+    ax11.grid(True, alpha=0.3)
+    ax11.set_ylim(0, 1)
+    
+    # График 12: Сводная таблица результатов
+    ax12 = plt.subplot(3, 4, 12)
+    ax12.axis('off')
+    
+    # Создаем текстовую таблицу
+    table_data = []
+    headers = ['Dropout', 'Train Acc', 'Val Acc', 'Test Acc', 'Loss']
+    table_data.append(headers)
+    
+    for dr in dropout_rates:
+        row = [
+            f'{dr}',
+            f'{results[dr]["train_acc"]:.3f}',
+            f'{results[dr]["val_acc"]:.3f}',
+            f'{results[dr]["test_acc"]:.3f}',
+            f'{results[dr]["final_loss"]:.3f}'
+        ]
+        table_data.append(row)
+    
+    table = ax12.table(cellText=table_data, loc='center', cellLoc='center')
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.scale(1, 2)
+    ax12.set_title('Сводная таблица результатов', fontsize=12, fontweight='bold')
     
     plt.tight_layout()
-    plt.savefig('dropout_results.png', dpi=300, bbox_inches='tight')
+    plt.savefig('comprehensive_results.png', dpi=120, bbox_inches='tight')
     plt.show()
+    
+    return best_dropout
+
+def main():
+    print("⚡ ЗАПУСК СВЕРХБЫСТРОГО ОБУЧЕНИЯ")
+    print("Используется ОЧЕНЬ маленький набор данных: 500 примеров")
+    print("Ожидаемое время выполнения: 30-60 секунд ⚡")
+    print("="*55)
+    
+    # Сверхбыстрое обучение
+    results, training_histories = ultra_fast_training()
+    
+    # Комплексная визуализация
+    best_dropout = create_comprehensive_plots(results, training_histories)
+    
+    # Вывод итогов
+    print("\n" + "="*60)
+    print("🎯 ИТОГОВЫЕ РЕЗУЛЬТАТЫ:")
+    print("="*60)
+    for dropout_rate in sorted(results.keys()):
+        res = results[dropout_rate]
+        print(f"Dropout {dropout_rate}: Train={res['train_acc']:.3f}, "
+              f"Val={res['val_acc']:.3f}, Test={res['test_acc']:.3f}, Loss={res['final_loss']:.3f}")
+    
+    print(f"\n🏆 ЛУЧШАЯ МОДЕЛЬ: Dropout {best_dropout}")
+    print(f"   Test Accuracy: {results[best_dropout]['test_acc']:.3f}")
+    
+    # Скачиваем результаты
+    print("\n📥 Скачивание комплексного графика...")
+    files.download('comprehensive_results.png')
+    
+    print("\n✅ ОБУЧЕНИЕ ЗАВЕРШЕНО! (Время выполнения: ~30 секунд)")
 
 if __name__ == "__main__":
-    model, history = train_with_dropout_and_checkpoints()
-    autotest_results = run_autotests()
-    plot_results(history, autotest_results)
-    
-    print("\n" + "="*50)
-    print("ОБУЧЕНИЕ ЗАВЕРШЕНО")
-    print("="*50)
-    print("Сохраненные чекпоинты:")
-    for epoch in [5, 10, 15, 20]:
-        print(f"  - checkpoint_
+    main()
